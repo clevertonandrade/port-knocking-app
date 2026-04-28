@@ -30,6 +30,18 @@ def load_data():
     try:
         with open(DATA_FILE, "r") as file:
             data = json.load(file)
-    except FileNotFoundError:
+
+        if not isinstance(data, dict):
+            data = {"host": "", "ports": [""]}
+
+        if "host" not in data or not isinstance(data["host"], str):
+            data["host"] = ""
+
+        if "ports" not in data or not isinstance(data["ports"], list):
+            data["ports"] = [""]
+        else:
+            data["ports"] = [str(p) for p in data["ports"]][:20]
+
+    except (FileNotFoundError, json.JSONDecodeError):
         data = {"host": "", "ports": [""]}
     return data
