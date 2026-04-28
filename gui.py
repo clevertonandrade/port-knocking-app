@@ -1,15 +1,12 @@
 import tkinter as tk
 from tkinter import PhotoImage
-import socket
-import json
 import threading
-import os
 import base64
 import validators
+import storage
+import knocker
 
 class PortKnockingApp:
-    DATA_FOLDER = os.path.join(os.getenv("APPDATA"), "PortKnockingApp")
-    DATA_FILE = os.path.join(DATA_FOLDER, "port_knocking_data.json")
     WINDOW_TITLE = "Port Knocking App"
     WINDOW_WIDTH = 300
     WINDOW_HEIGHT = 35 * 5
@@ -54,7 +51,7 @@ class PortKnockingApp:
         self.add_port_button = tk.Button(self.root, text="Add Port", command=self.add_port)
         self.add_port_button.pack(pady=5)
 
-        self.check_button = tk.Button(self.root, text="Perform Port Knocking", command=self.perform_port_knocking)
+        self.check_button = tk.Button(self.root, text="Perform Port Knocking", command=self.start_port_knocking)
         self.check_button.pack(pady=5)
 
         self.status_message = tk.Label(self.root, text="", font=("Helvetica", 12), fg="black")
@@ -106,7 +103,7 @@ class PortKnockingApp:
         for button in remove_buttons:
             button["state"] = "disabled" if len(remove_buttons) == 1 else "normal"
 
-    def perform_port_knocking(self):
+    def start_port_knocking(self):
         host = self.host_entry.get()
         ports = [int(entry.get()) for frame in self.port_frame.winfo_children() for entry in frame.winfo_children() if isinstance(entry, tk.Entry) and entry.get()] if self.port_frame.winfo_children() else []
         self.status_message.config(text="")
@@ -119,49 +116,47 @@ class PortKnockingApp:
             self.status_message.config(text="\u2717 No ports added", fg="red")
             return
 
-        threading.Thread(target=self.perform_port_knocking_thread, args=(host, ports)).start()
+        # Save data before knocking
+        self.save_data()
+
+        self.status_message.config(text="Knocking...", fg="blue")
+        threading.Thread(target=self.perform_port_knocking_thread, args=(host, ports), daemon=True).start()
 
     def perform_port_knocking_thread(self, host, ports):
-        try:
-            for port in ports:
-                try:
-                    socket.create_connection((host, port), timeout=0.01)
-                except (socket.timeout):
-                    continue 
-            self.status_message.config(text="\u2713 Port Knocking Successful", fg="green")
-        except Exception:
-            self.status_message.config(text="\u2717 Port Knocking Failed", fg="red")
+        success = knocker.perform_port_knocking(host, ports)
 
-        self.save_data()
+        # Schedule GUI update on the main thread
+        self.root.after(0, self.update_status, success)
+
+    def update_status(self, success):
+        if success:
+            self.status_message.config(text="\u2713 Port Knocking Successful", fg="green")
+        else:
+            self.status_message.config(text="\u2717 Port Knocking Failed", fg="red")
 
     def save_data(self):
         host = self.host_entry.get()
         ports = [entry.get() for frame in self.port_frame.winfo_children() for entry in frame.winfo_children() if isinstance(entry, tk.Entry)]
-        data = {"host": host, "ports": ports}
-
-        # Ensure the data folder exists
-        os.makedirs(self.DATA_FOLDER, exist_ok=True)
-
-        with open(self.DATA_FILE, "w") as file:
-            json.dump(data, file)
+        storage.save_data(host, ports)
 
     def load_data(self):
-        try:
-            with open(self.DATA_FILE, "r") as file:
-                data = json.load(file)
-        except FileNotFoundError:
-            data = {"host": "", "ports": [""]}
+        data = storage.load_data()
 
         self.host_entry.insert(0, data["host"])
-        self.original_window_height = (len(data["ports"]) * 35) + self.WINDOW_HEIGHT
 
-        for port in data["ports"]:
+        ports = data.get("ports", [""])
+        if not ports:
+            ports = [""]
+
+        self.original_window_height = (len(ports) * 35) + self.WINDOW_HEIGHT
+
+        for port in ports:
             self.add_port(port)
 
         self.root.geometry(f"{self.WINDOW_WIDTH}x{self.original_window_height}")
         self.update_remove_button_state()
 
-if __name__ == "__main__":
+def run_app():
     root = tk.Tk()
     app = PortKnockingApp(root)
     root.mainloop()
