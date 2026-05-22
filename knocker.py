@@ -7,9 +7,10 @@ def perform_port_knocking(host, ports):
     and False if a broader exception occurs.
     """
     try:
+        ip = socket.getaddrinfo(host, None)[0][4][0]
         for port in ports:
             try:
-                socket.create_connection((host, port), timeout=0.01)
+                socket.create_connection((ip, port), timeout=0.01)
             except socket.timeout:
                 continue
         return True
