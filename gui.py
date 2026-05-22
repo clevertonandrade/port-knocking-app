@@ -129,7 +129,7 @@ class PortKnockingApp:
 
         self.status_message.config(text="")
 
-        if not any([validators.ipv4(host), validators.ipv6(host), validators.domain(host)]):
+        if not (validators.ipv4(host) or validators.ipv6(host) or validators.domain(host)):
             self.status_message.config(text="\u2717 Invalid Host", fg="red")
             return
 
