@@ -62,3 +62,29 @@ def test_load_data_enforce_port_limit(temp_data_file):
     assert data["host"] == "localhost"
     assert len(data["ports"]) == 20
     assert data["ports"] == [str(i) for i in range(20)]
+
+
+def test_save_data_success(temp_data_file):
+    storage.save_data("example.com", ["80", "443"])
+
+    assert os.path.exists(temp_data_file)
+    with open(temp_data_file, "r") as f:
+        data = json.load(f)
+
+    assert data == {"host": "example.com", "ports": ["80", "443"]}
+
+
+def test_save_data_creates_folder(temp_data_file):
+    # Remove the folder created by the fixture to ensure save_data recreates it
+    if os.path.exists(storage.DATA_FOLDER):
+        os.rmdir(storage.DATA_FOLDER)
+
+    storage.save_data("test.com", ["22"])
+
+    assert os.path.exists(storage.DATA_FOLDER)
+    assert os.path.exists(temp_data_file)
+
+    with open(temp_data_file, "r") as f:
+        data = json.load(f)
+
+    assert data == {"host": "test.com", "ports": ["22"]}
