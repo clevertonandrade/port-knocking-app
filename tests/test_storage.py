@@ -62,3 +62,26 @@ def test_load_data_enforce_port_limit(temp_data_file):
     assert data["host"] == "localhost"
     assert len(data["ports"]) == 20
     assert data["ports"] == [str(i) for i in range(20)]
+
+def test_get_data_folder_windows(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Windows")
+    monkeypatch.setenv("APPDATA", "C:\\Users\\TestUser\\AppData\\Roaming")
+    assert storage.get_data_folder() == os.path.join("C:\\Users\\TestUser\\AppData\\Roaming", "PortKnockingApp")
+
+def test_get_data_folder_darwin(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    original_expanduser = os.path.expanduser
+    monkeypatch.setattr("os.path.expanduser", lambda p: "/Users/TestUser/Library/Application Support" if p == "~/Library/Application Support" else original_expanduser(p))
+    assert storage.get_data_folder() == os.path.join("/Users/TestUser/Library/Application Support", "PortKnockingApp")
+
+def test_get_data_folder_linux_xdg(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", "/home/testuser/.config/custom")
+    assert storage.get_data_folder() == os.path.join("/home/testuser/.config/custom", "PortKnockingApp")
+
+def test_get_data_folder_linux_default(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    original_expanduser = os.path.expanduser
+    monkeypatch.setattr("os.path.expanduser", lambda p: "/home/testuser/.config" if p == "~/.config" else original_expanduser(p))
+    assert storage.get_data_folder() == os.path.join("/home/testuser/.config", "PortKnockingApp")
